@@ -15,12 +15,13 @@ import {
 } from 'lucide-react'
 import DNSEAuth from '../components/DNSEAuth'
 
-const DNSETrading = () => {
+const DNSETrading = ({ onAuthChange }) => {
   // Authentication state from DNSEAuth component
   const [authData, setAuthData] = useState({
     isAuthenticated: false,
     hasTradingToken: false,
     userInfo: null,
+    tradingToken: null,
     accounts: []
   })
 

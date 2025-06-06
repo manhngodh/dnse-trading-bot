@@ -31,10 +31,11 @@ const DNSEAuth = ({ onAuthChange }) => {
         isAuthenticated: authState.isAuthenticated,
         hasTradingToken: authState.hasTradingToken,
         userInfo: authState.userInfo,
+        tradingToken: authState.tradingToken,
         accounts: authState.accounts
       })
     }
-  }, [authState.isAuthenticated, authState.hasTradingToken, authState.userInfo, authState.accounts, onAuthChange])
+  }, [authState.isAuthenticated, authState.hasTradingToken, authState.userInfo, authState.tradingToken, authState.accounts, onAuthChange])
 
   const showAlert = (message, type = 'info') => {
     setAlert({ message, type })
@@ -53,7 +54,8 @@ const DNSEAuth = ({ onAuthChange }) => {
           ...prev,
           step: 'success',
           isAuthenticated: true,
-          hasTradingToken: true
+          hasTradingToken: true,
+          tradingToken: data.trading_token || null
         }))
         loadUserInfo()
       } else if (data.authenticated) {
@@ -61,7 +63,8 @@ const DNSEAuth = ({ onAuthChange }) => {
           ...prev,
           step: 'otp',
           isAuthenticated: true,
-          hasTradingToken: false
+          hasTradingToken: false,
+          tradingToken: null
         }))
       } else {
         setAuthState(prev => ({
@@ -179,6 +182,7 @@ const DNSEAuth = ({ onAuthChange }) => {
           step: 'success',
           hasTradingToken: true,
           userInfo: data.user_info,
+          tradingToken: data.trading_token || null,
           accounts: data.accounts || []
         }))
       } else {
