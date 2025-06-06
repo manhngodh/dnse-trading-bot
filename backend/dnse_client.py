@@ -12,9 +12,10 @@ Features:
     - Market data access
     - Buying power analysis
     - Portfolio management
+    - Conditional orders support
 
 Usage:
-    from src.clients import DNSEClient
+    from backend.dnse_client import DNSEClient
     
     client = DNSEClient(username="user", password="pass")
     client.authenticate()
@@ -76,7 +77,8 @@ class DNSEClient(ITradingClient):
         self.base_urls = {
             'user_service': 'https://api.dnse.com.vn/user-service',
             'auth_service': 'https://api.dnse.com.vn/auth-service',
-            'order_service': 'https://api.dnse.com.vn/order-service'
+            'order_service': 'https://api.dnse.com.vn/order-service',
+            'conditional_order_api': 'https://api.dnse.com.vn/conditional-order-api/v1'
         }
     
     def authenticate(self) -> bool:
@@ -305,6 +307,27 @@ class DNSEClient(ITradingClient):
             raise DNSEAPIError(f"Failed to get buying power: HTTP {e.response.status_code}")
         except Exception as e:
             raise DNSEAPIError(f"Failed to get buying power: {str(e)}")
+    
+    def get_buying_power_ext(self, account_no: str, symbol: str, price: float, loan_package_id: str = None) -> Dict[str, Any]:
+        """
+        Get enhanced buying/selling power for a specific account, symbol, price, and loan package.
+        Implements API: /order-service/accounts/<account>/ppse?symbol=<symbol>&price=<price>&loanPackageId=<loanPackageId>
+        """
+        if not self.jwt_token:
+            raise DNSEAPIError("Must authenticate first")
+        try:
+            url = f"{self.base_urls['order_service']}/accounts/{account_no}/ppse"
+            headers = {"Authorization": f"Bearer {self.jwt_token}"}
+            params = {"symbol": symbol, "price": price}
+            if loan_package_id:
+                params["loanPackageId"] = loan_package_id
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except HTTPError as e:
+            raise DNSEAPIError(f"Failed to get enhanced buying power: HTTP {e.response.status_code}")
+        except Exception as e:
+            raise DNSEAPIError(f"Failed to get enhanced buying power: {str(e)}")
     
     def get_max_buy_quantity(self, symbol: str, price: float, account_no: str) -> int:
         """
@@ -727,6 +750,159 @@ class DNSEClient(ITradingClient):
         except Exception as e:
             raise DNSEAPIError(f"Failed to get order details for {order_id}: {str(e)}")
     
+    # Conditional Orders Methods
+    def place_conditional_order(self, condition: str, target_order: dict, symbol: str, props: dict, account_no: str, category: str, time_in_force: dict) -> Dict[str, Any]:
+        """
+        Place a conditional order (lệnh điều kiện).
+        Implements API: POST /conditional-order-api/v1/orders
+        
+        Args:
+            condition: The price condition (e.g., "price >= 26650" or "price <= 26650")
+            target_order: Dictionary with order details (quantity, side, price, loanPackageId, orderType)
+            symbol: Stock symbol
+            props: Dictionary with properties (stopPrice, marketId)
+            account_no: Account number
+            category: Order category (typically "STOP")
+            time_in_force: Dictionary with time constraints (expireTime, kind)
+            
+        Returns:
+            Dictionary with the order ID
+        """
+        if not self.jwt_token:
+            raise DNSEAPIError("Must authenticate first")
+        try:
+            url = f"{self.base_urls['conditional_order_api']}/orders"
+            headers = {
+                "Authorization": f"Bearer {self.jwt_token}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "condition": condition,
+                "targetOrder": target_order,
+                "symbol": symbol,
+                "props": props,
+                "accountNo": account_no,
+                "category": category,
+                "timeInForce": time_in_force
+            }
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.json()
+        except HTTPError as e:
+            raise DNSEAPIError(f"Failed to place conditional order: HTTP {e.response.status_code}")
+        except Exception as e:
+            raise DNSEAPIError(f"Failed to place conditional order: {str(e)}")
+    
+    def get_conditional_orders(self, account_no: str, daily: bool = False, from_date: str = None, to_date: str = None, page: int = 1, size: int = 100, status: list = None, symbol: str = None, market_id: str = None) -> Dict[str, Any]:
+        """
+        Get list of conditional orders (sổ lệnh điều kiện).
+        Implements API: GET /conditional-order-api/v1/orders
+        
+        Args:
+            account_no: Account number
+            daily: Whether to get only today's orders (default: False)
+            from_date: Start date in format yyyy-MM-dd
+            to_date: End date in format yyyy-MM-dd
+            page: Page number for pagination
+            size: Number of items per page
+            status: List of order statuses (NEW/ACTIVATED/REJECTED/CANCELLED/EXPIRED/FAILED)
+            symbol: Stock symbol filter
+            market_id: Market ID filter (UNDERLYING for stocks, DERIVATIVES for derivatives)
+            
+        Returns:
+            Dictionary with pagination information and list of conditional orders
+        """
+        if not self.jwt_token:
+            raise DNSEAPIError("Must authenticate first")
+        try:
+            url = f"{self.base_urls['conditional_order_api']}/orders"
+            headers = {"Authorization": f"Bearer {self.jwt_token}"}
+            params = {"accountNo": account_no, "daily": str(daily).lower(), "page": page, "size": size}
+            if from_date:
+                params["from"] = from_date
+            if to_date:
+                params["to"] = to_date
+            if status:
+                params["status"] = status
+            if symbol:
+                params["symbol"] = symbol
+            if market_id:
+                params["marketId"] = market_id
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except HTTPError as e:
+            raise DNSEAPIError(f"Failed to get conditional orders: HTTP {e.response.status_code}")
+        except Exception as e:
+            raise DNSEAPIError(f"Failed to get conditional orders: {str(e)}")
+    
+    def get_conditional_order_detail(self, order_id: str) -> Dict[str, Any]:
+        """
+        Get detail of a conditional order by ID.
+        Implements API: GET /conditional-order-api/v1/orders/{id}
+        
+        Args:
+            order_id: ID of the conditional order
+            
+        Returns:
+            Dictionary with detailed conditional order information
+        """
+        if not self.jwt_token:
+            raise DNSEAPIError("Must authenticate first")
+        try:
+            url = f"{self.base_urls['conditional_order_api']}/orders/{order_id}"
+            headers = {"Authorization": f"Bearer {self.jwt_token}"}
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except HTTPError as e:
+            raise DNSEAPIError(f"Failed to get conditional order detail: HTTP {e.response.status_code}")
+        except Exception as e:
+            raise DNSEAPIError(f"Failed to get conditional order detail: {str(e)}")
+    
+    def cancel_conditional_order(self, order_id: str) -> Dict[str, Any]:
+        """
+        Cancel a conditional order by ID.
+        Implements API: PATCH /conditional-order-api/v1/orders/{id}/cancel
+        
+        Args:
+            order_id: ID of the conditional order to cancel
+            
+        Returns:
+            Dictionary with the cancelled order ID
+        """
+        if not self.jwt_token:
+            raise DNSEAPIError("Must authenticate first")
+        try:
+            url = f"{self.base_urls['conditional_order_api']}/orders/{order_id}/cancel"
+            headers = {"Authorization": f"Bearer {self.jwt_token}"}
+            response = requests.patch(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except HTTPError as e:
+            raise DNSEAPIError(f"Failed to cancel conditional order: HTTP {e.response.status_code}")
+        except Exception as e:
+            raise DNSEAPIError(f"Failed to cancel conditional order: {str(e)}")
+    
+    def get_order_book(self, account_no: str) -> Dict[str, Any]:
+        """
+        Get order book (sổ lệnh) for a specific account.
+        Implements API: GET /order-service/v2/orders?accountNo=<account>
+        """
+        if not self.jwt_token:
+            raise DNSEAPIError("Must authenticate first")
+        try:
+            url = f"{self.base_urls['order_service']}/v2/orders"
+            headers = {"Authorization": f"Bearer {self.jwt_token}"}
+            params = {"accountNo": account_no}
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except HTTPError as e:
+            raise DNSEAPIError(f"Failed to get order book: HTTP {e.response.status_code}")
+        except Exception as e:
+            raise DNSEAPIError(f"Failed to get order book: {str(e)}")
+    
     # Utility Methods
     def select_loan_package(self, loan_packages: List[Dict[str, Any]], prefer_non_margin: bool = True) -> Optional[Dict[str, Any]]:
         """
@@ -911,3 +1087,169 @@ class DNSEClient(ITradingClient):
         )
         
         return self.place_order(order_request)
+    
+    def create_stop_order(self, symbol: str, stop_price: float, order_price: float, 
+                     quantity: int, side: OrderSide, account_no: str, 
+                     loan_package_id: str = None, expire_time: str = None,
+                     market_id: str = "UNDERLYING") -> Dict[str, Any]:
+        """
+        Convenience method to create a stop order (stop-loss or stop-buy).
+        
+        Args:
+            symbol: Stock symbol
+            stop_price: Trigger price
+            order_price: Order price once triggered
+            quantity: Order quantity
+            side: OrderSide.BUY or OrderSide.SELL
+            account_no: Account number
+            loan_package_id: Optional loan package ID 
+            expire_time: Order expiry time in format "YYYY-MM-DDThh:mm:ss.000Z", defaults to end of trading day
+            market_id: Market ID ("UNDERLYING" for stocks, "DERIVATIVES" for derivatives)
+            
+        Returns:
+            Order placement response dictionary
+        """
+        # Map the side enum to API values
+        side_str = "NB" if side == OrderSide.BUY else "NS"
+        
+        # Set condition based on side
+        if side == OrderSide.BUY:
+            # For stop buy orders, execute when price rises above stop_price
+            condition = f"price >= {stop_price}"
+        else:
+            # For stop sell (stop loss) orders, execute when price falls below stop_price
+            condition = f"price <= {stop_price}"
+        
+        # Set default expiry time to end of current trading day if not provided
+        if not expire_time:
+            # Get current date in Vietnam time and set to 14:30 (market close)
+            now = datetime.now()
+            expire_time = f"{now.year}-{now.month:02d}-{now.day:02d}T07:30:00.000Z"  # UTC time (14:30 Vietnam time)
+        
+        # Create target order
+        target_order = {
+            "quantity": quantity,
+            "side": side_str,
+            "price": order_price,
+            "orderType": "LO"
+        }
+        
+        if loan_package_id:
+            target_order["loanPackageId"] = loan_package_id
+        
+        # Properties
+        props = {
+            "stopPrice": stop_price,
+            "marketId": market_id
+        }
+        
+        # Time in force
+        time_in_force = {
+            "expireTime": expire_time,
+            "kind": "GTD"  # Good Till Date
+        }
+        
+        return self.place_conditional_order(
+            condition=condition,
+            target_order=target_order,
+            symbol=symbol,
+            props=props,
+            account_no=account_no,
+            category="STOP",
+            time_in_force=time_in_force
+        )
+
+    def quick_stop_loss(self, symbol: str, stop_price: float, order_price: float, quantity: int,
+                        account_index: int = 0, expire_time: str = None) -> Dict[str, Any]:
+        """
+        Quick method to place a stop-loss order.
+        
+        Args:
+            symbol: Stock symbol
+            stop_price: Price that triggers the stop-loss
+            order_price: Sell price once triggered (usually same or slightly lower than stop_price)
+            quantity: Quantity to sell
+            account_index: Account index to use (default: 0)
+            expire_time: Order expiry time (default: end of trading day)
+            
+        Returns:
+            Conditional order placement response
+        """
+        if not self.accounts:
+            raise DNSEAPIError("No accounts available. Setup session first.")
+        
+        if account_index >= len(self.accounts):
+            raise DNSEAPIError(f"Account index {account_index} out of range")
+        
+        account_id = self.accounts[account_index].get("id") or self.accounts[account_index].get("accountNo")
+        
+        return self.create_stop_order(
+            symbol=symbol,
+            stop_price=stop_price,
+            order_price=order_price,
+            quantity=quantity,
+            side=OrderSide.SELL,  # Stop-loss is a sell order
+            account_no=account_id,
+            expire_time=expire_time
+        )
+
+    def quick_take_profit(self, symbol: str, target_price: float, order_price: float, quantity: int,
+                          account_index: int = 0, expire_time: str = None) -> Dict[str, Any]:
+        """
+        Quick method to place a take-profit order (sell when price reaches target).
+        
+        Args:
+            symbol: Stock symbol
+            target_price: Price that triggers the take-profit
+            order_price: Sell price once triggered (usually same or slightly lower than target_price)
+            quantity: Quantity to sell
+            account_index: Account index to use (default: 0)
+            expire_time: Order expiry time (default: end of trading day)
+            
+        Returns:
+            Conditional order placement response
+        """
+        if not self.accounts:
+            raise DNSEAPIError("No accounts available. Setup session first.")
+        
+        if account_index >= len(self.accounts):
+            raise DNSEAPIError(f"Account index {account_index} out of range")
+        
+        account_id = self.accounts[account_index].get("id") or self.accounts[account_index].get("accountNo")
+        
+        # Take-profit is triggered when price rises above target
+        condition = f"price >= {target_price}"
+        
+        target_order = {
+            "quantity": quantity,
+            "side": "NS",  # Take-profit is a sell order
+            "price": order_price,
+            "orderType": "LO"
+        }
+        
+        # Set default expiry time if not provided
+        if not expire_time:
+            now = datetime.now()
+            expire_time = f"{now.year}-{now.month:02d}-{now.day:02d}T07:30:00.000Z"  # UTC time (14:30 Vietnam time)
+        
+        # Properties
+        props = {
+            "stopPrice": target_price,
+            "marketId": "UNDERLYING"
+        }
+        
+        # Time in force
+        time_in_force = {
+            "expireTime": expire_time,
+            "kind": "GTD"  # Good Till Date
+        }
+        
+        return self.place_conditional_order(
+            condition=condition,
+            target_order=target_order,
+            symbol=symbol,
+            props=props,
+            account_no=account_id,
+            category="STOP",  # Even though it's take-profit, category is still "STOP"
+            time_in_force=time_in_force
+        )
