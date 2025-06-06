@@ -1,0 +1,10 @@
+---
+url: "https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh"
+title: "5.\tGiao dịch phái sinh | ENTRADE X"
+---
+
+[5.1. Danh sách gói vay](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.1.-danh-sach-goi-vay) [5.2. Sức mua, sức bán](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.2.-suc-mua-suc-ban) [5.3. Đặt lệnh](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.3.-dat-lenh) [5.4. Sổ lệnh](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.4.-so-lenh) [5.5. Chi tiết lệnh](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.5.-chi-tiet-lenh) [5.6. Huỷ lệnh](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.6.-huy-lenh) [5.7. Danh sách deal nắm giữ](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.7.-danh-sach-deal-nam-giu) [5.8 Cài chốt lời cắt lỗ theo Deal](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.8-cai-chot-loi-cat-lo-theo-deal) [5.9 Cài chốt lời cắt lỗ theo Account](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.9-cai-chot-loi-cat-lo-theo-account) [5.10 Đóng deal](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.10-dong-deal)
+
+[Previous4.6. Danh sách deal nắm giữ](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/4.-giao-dich-co-so/4.6.-danh-sach-deal-nam-giu) [Next5.1. Danh sách gói vay](https://hdsd.dnse.com.vn/san-pham-dich-vu/lightspeed-api_krx/ii.-trading-api/5.-giao-dich-phai-sinh/5.1.-danh-sach-goi-vay)
+
+Was this helpful?
