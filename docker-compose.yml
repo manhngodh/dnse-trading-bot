@@ -4,11 +4,15 @@ services:
   backend:
     build:
       context: ./backend
+      dockerfile: Dockerfile.dev # Use the development Dockerfile
     restart: always
     environment:
-      - FLASK_ENV=production
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    ports:
+      - "5000:5000" # Map port for direct API access
     volumes:
-      - ./backend:/app
+      - ./backend:/app # Mount source code for hot reload
     networks:
       - app-network
 

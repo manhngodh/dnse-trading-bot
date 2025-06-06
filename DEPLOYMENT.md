@@ -1,8 +1,48 @@
-# Terraform Docker Deployment Instructions
+# DNSE Trading Bot Deployment Instructions
 
 This project includes a GitHub Actions workflow for automatic deployment to the server at `173.249.7.24` using Terraform and Docker.
 
-## Prerequisites
+## Development Environment
+
+The development environment is set up to allow hot reloading of the application code. This means any changes you make to the code will be immediately reflected in the running application without requiring a rebuild of the Docker containers.
+
+### Starting Development Environment
+
+To start the development environment:
+
+```bash
+./dev.sh
+```
+
+This will:
+1. Build the Docker containers with development configurations
+2. Mount your local source code into the containers
+3. Start the Flask development server with hot reloading enabled
+4. Expose the backend API on port 5000
+
+### Accessing Development Logs
+
+To view the logs from the development containers:
+
+```bash
+./logs-dev.sh
+```
+
+To view logs from a specific service:
+
+```bash
+./logs-dev.sh backend
+```
+
+### Stopping Development Environment
+
+To stop the development environment:
+
+```bash
+./stop-dev.sh
+```
+
+## Production Prerequisites
 
 The target server should have:
 

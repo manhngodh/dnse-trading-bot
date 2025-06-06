@@ -1,55 +1,55 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+import uvicorn
 
 # Import core modules
-from core.config import active_config
 from core.logging import setup_logging
 
-# Import route blueprints
-from routes.auth import auth_bp
-from routes.market import market_bp
-from routes.order import order_bp
-from routes.portfolio import portfolio_bp
+# Import route routers - uncomment as you create the FastAPI routers
+from routes.auth_fastapi import router as auth_router
+# from routes.market_fastapi import router as market_router
+# from routes.order_fastapi import router as order_router
+# from routes.portfolio_fastapi import router as portfolio_router
 
 # Initialize logging
 logger = setup_logging()
 
-def create_app():
-    """Create and configure the Flask application"""
-    app = Flask(__name__)
-    
-    # Configure app from active configuration
-    app.config.from_object(active_config)
-    
-    # Enable CORS
-    CORS(app)
-    
-    # Register blueprints with URL prefixes
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(market_bp, url_prefix='/api/market')
-    app.register_blueprint(order_bp, url_prefix='/api/order')
-    app.register_blueprint(portfolio_bp, url_prefix='/api/portfolio')
-    
-    # Basic health check endpoint
-    @app.route('/api/health', methods=['GET'])
-    def health_check():
-        """Health check endpoint"""
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
-            'version': '1.0.0'
-        })
-    
-    return app
+# Create the FastAPI application
+app = FastAPI(
+    title="DNSE Trading Bot API",
+    description="API for trading operations with DNSE",
+    version="1.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json"
+)
 
-# Entry point for WSGI servers
-application = create_app()
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure appropriately for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Basic health check endpoint
+@app.get("/api/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint"""
+    return {
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0.0'
+    }
+
+# Include routers
+app.include_router(auth_router, prefix='/api/auth', tags=["Authentication"])
+# app.include_router(market_router, prefix='/api/market', tags=["Market Data"])
+# app.include_router(order_router, prefix='/api/order', tags=["Order Management"])
+# app.include_router(portfolio_router, prefix='/api/portfolio', tags=["Portfolio"])
 
 if __name__ == '__main__':
-    app = application
-    
-    print("🚀 Starting DNSE Trading Bot Backend Server...")
-    print("🌐 Server running on http://localhost:5001")
-
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    import uvicorn
+    uvicorn.run("main_fastapi:app", host="0.0.0.0", port=5000, reload=True)

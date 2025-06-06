@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  # FastAPI backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1 # Don't write .pyc files
+      - PYTHONUNBUFFERED=1 # Output logs immediately
+    ports:
+      - "5001:5000" # Use port 5001 on host
+    volumes:
+      - ./backend:/app # Mount source code for hot reload
+    networks:
+      - app-network
+    command:
+      [
+        "uvicorn",
+        "main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5000",
+        "--reload",
+      ]
+
+  frontend:
+    build:
+      context: ./ui
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    # You might want to add frontend dev server configuration here
+
+networks:
+  app-network:
+    driver: bridge

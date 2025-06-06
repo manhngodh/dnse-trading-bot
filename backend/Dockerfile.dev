@@ -1,15 +1,27 @@
+# Use Python 3.9 as base image for development
 FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install development tools
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (if any)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# We'll install dependencies at runtime to allow for easy updates during development
+# Install Python dependencies first (for caching)
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Keep the container running
-CMD ["sh", "-c", "tail -f /dev/null"]
+# This will be mounted as a volume in development mode
+# So we don't need to copy application code here
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Expose port
+EXPOSE 5000
+
+# Command to run the FastAPI application with hot-reload
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--reload"]
