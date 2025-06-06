@@ -1,0 +1,3 @@
+ssh_user = "your_ssh_username"
+private_key_path = "path/to/your/private_key"
+remote_dir = "/opt/dnse-trading-bot"

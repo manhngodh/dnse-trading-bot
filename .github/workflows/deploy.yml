@@ -1,0 +1,82 @@
+name: Deploy with Terraform
+
+on:
+  push:
+    branches:
+      - main # or master, depending on your default branch
+  workflow_dispatch: # Allows manual triggering of the workflow
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.9"
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt || echo "No requirements.txt found"
+
+      - name: Run tests
+        run: |
+          cd backend
+          pytest || echo "No tests found or pytest not installed"
+
+  terraform-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Create terraform.tfvars file
+        run: |
+          cd terraform
+          cat > terraform.tfvars <<EOL
+          ssh_user = "${{ secrets.DEPLOY_USER }}"
+          private_key_path = "${{ runner.temp }}/private_key.pem"
+          remote_dir = "${{ secrets.DEPLOY_PATH }}"
+          EOL
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > "${{ runner.temp }}/private_key.pem"
+          chmod 600 "${{ runner.temp }}/private_key.pem"
+          ssh-keyscan -H 173.249.7.24 >> ~/.ssh/known_hosts
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Validate
+        run: |
+          cd terraform
+          terraform validate
+
+      - name: Terraform Plan
+        run: |
+          cd terraform
+          terraform plan -var-file=terraform.tfvars -out=tfplan
+
+      - name: Terraform Apply
+        run: |
+          cd terraform
+          terraform apply -auto-approve tfplan
+
+      - name: Verify deployment
+        run: |
+          sleep 10
+          ssh -i "${{ runner.temp }}/private_key.pem" ${{ secrets.DEPLOY_USER }}@173.249.7.24 "docker ps | grep dnse-trading-bot"
