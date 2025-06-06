@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from ..services.market_service import MarketService
-from ..exceptions import DNSEAPIError
+from services.market_service import MarketService
+from exceptions import DNSEAPIError
 
 market_bp = Blueprint('market', __name__)
 market_service = MarketService()

@@ -1,5 +1,5 @@
-from ..interfaces.trading_client import ITradingClient
-from ..dnse_client import DNSEClient
+from interfaces.trading_client import ITradingClient
+from dnse_client import DNSEClient
 
 class AuthService:
     def __init__(self):

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from ..services.auth_service import AuthService
-from ..exceptions import DNSEAPIError
+from services.auth_service import AuthService
+from exceptions import DNSEAPIError
 
 auth_bp = Blueprint('auth', __name__)
 auth_service = AuthService()

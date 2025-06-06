@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
-from ..dnse_client import DNSEClient
-from ..core.data_structures import OrderRequest
+from dnse_client import DNSEClient
+from core.data_structures import OrderRequest
 
 class OrderService:
     def __init__(self):

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from ..services.order_service import OrderService
-from ..exceptions import DNSEAPIError
+from services.order_service import OrderService
+from exceptions import DNSEAPIError
 
 order_bp = Blueprint('order', __name__)
 order_service = OrderService()

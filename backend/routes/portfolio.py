@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from ..services.portfolio_service import PortfolioService
-from ..exceptions import DNSEAPIError
+from services.portfolio_service import PortfolioService
+from exceptions import DNSEAPIError
 
 portfolio_bp = Blueprint('portfolio', __name__)
 portfolio_service = PortfolioService()

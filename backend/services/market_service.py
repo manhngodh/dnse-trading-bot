@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from ..dnse_client import DNSEClient
+from dnse_client import DNSEClient
 
 class MarketService:
     def __init__(self):

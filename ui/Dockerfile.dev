@@ -1,0 +1,12 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install development tools
+RUN apk add --no-cache git
+
+# We'll install dependencies at runtime to allow for easy updates during development
+COPY package.json package-lock.json* ./
+
+# Keep the container running
+CMD ["sh", "-c", "tail -f /dev/null"]

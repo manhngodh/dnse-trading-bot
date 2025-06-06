@@ -1,6 +1,6 @@
 from typing import Dict, Any
-from ..dnse_client import DNSEClient
-from ..exceptions import DNSEAPIError
+from dnse_client import DNSEClient
+from exceptions import DNSEAPIError
 
 class PortfolioService:
     def __init__(self):
