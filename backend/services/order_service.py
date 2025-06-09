@@ -29,4 +29,22 @@ class OrderService:
         """
         Get all pending orders for an account
         """
-        return self.client.get_pending_orders(account_no)
+        orders = self.client.get_orders(account_no)
+        
+        # Filter for pending orders only
+        pending_statuses = ["pending", "pendingNew", "new", "partiallyFilled"]
+        pending_orders = [order for order in orders if order.get("orderStatus") in pending_statuses]
+        
+        return pending_orders
+        
+    def get_orders(self, account_no: str) -> List[Dict[str, Any]]:
+        """
+        Get all orders for an account (includes orders with any status)
+        
+        Args:
+            account_no: The account number
+            
+        Returns:
+            List of all orders for the account
+        """
+        return self.client.get_orders(account_no)

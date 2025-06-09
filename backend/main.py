@@ -4,16 +4,16 @@ from datetime import datetime
 import uvicorn
 
 # Import core modules
-from core.logging import setup_logging
+from core.logging import setup_logging, log_request_middleware
 
 # Import route routers - uncomment as you create the FastAPI routers
-from routes.auth_fastapi import router as auth_router
-# from routes.market_fastapi import router as market_router
+from routes.auth import router as auth_router
 # from routes.order_fastapi import router as order_router
 # from routes.portfolio_fastapi import router as portfolio_router
 
 # Initialize logging
-logger = setup_logging()
+logger = setup_logging(log_level='DEBUG')
+logger.info("Starting DNSE Trading Bot API")
 
 # Create the FastAPI application
 app = FastAPI(
@@ -24,6 +24,9 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
 )
+
+# Add logging middleware
+app.middleware("http")(log_request_middleware)
 
 # Enable CORS
 app.add_middleware(
@@ -45,11 +48,11 @@ async def health_check():
     }
 
 # Include routers
-app.include_router(auth_router, prefix='/api/auth', tags=["Authentication"])
+app.include_router(auth_router, prefix='/api/dnse', tags=["Authentication"])
 # app.include_router(market_router, prefix='/api/market', tags=["Market Data"])
 # app.include_router(order_router, prefix='/api/order', tags=["Order Management"])
 # app.include_router(portfolio_router, prefix='/api/portfolio', tags=["Portfolio"])
 
 if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run("main_fastapi:app", host="0.0.0.0", port=5000, reload=True)
+    # uvicorn is already imported at the top of the file
+    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)

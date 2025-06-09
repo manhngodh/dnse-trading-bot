@@ -92,7 +92,7 @@ class DNSEClient(ITradingClient):
             DNSEAPIError: If authentication fails
         """
         try:
-            url = f"{self.base_urls['auth_service']}/auth/login"
+            url = f"{self.base_urls['auth_service']}/login"
             payload = {
                 "username": self.username,
                 "password": self.password
@@ -102,7 +102,7 @@ class DNSEClient(ITradingClient):
             response.raise_for_status()
             
             response_data = response.json()
-            self.jwt_token = response_data.get("accessToken")
+            self.jwt_token = response_data.get("token")
             
             if not self.jwt_token:
                 raise DNSEAPIError("No access token received from authentication")
@@ -134,13 +134,13 @@ class DNSEClient(ITradingClient):
             raise DNSEAPIError("Must authenticate first before requesting OTP")
         
         try:
-            url = f"{self.base_urls['order_service']}/otp/email"
+            url = f"{self.base_urls['auth_service']}/api/email-otp"
             headers = {
                 "Authorization": f"Bearer {self.jwt_token}",
                 "Content-Type": "application/json"
             }
             
-            response = requests.post(url, headers=headers, json={})
+            response = requests.get(url, headers=headers, json={})
             response.raise_for_status()
             
             return True
@@ -213,7 +213,7 @@ class DNSEClient(ITradingClient):
             raise DNSEAPIError("Must authenticate first")
         
         try:
-            url = f"{self.base_urls['user_service']}/user/me"
+            url = f"{self.base_urls['user_service']}/api/me"
             headers = {"Authorization": f"Bearer {self.jwt_token}"}
             
             response = requests.get(url, headers=headers)
@@ -598,9 +598,41 @@ class DNSEClient(ITradingClient):
         except Exception as e:
             raise DNSEAPIError(f"Failed to get portfolio: {str(e)}")
     
+    def get_orders(self, account_no: str) -> List[Dict[str, Any]]:
+        """
+        Get all orders for an account.
+        
+        Args:
+            account_no: Account number
+            
+        Returns:
+            List of order dictionaries with any status
+        """
+        if not self.jwt_token:
+            raise DNSEAPIError("Must authenticate first")
+        
+        try:
+            # According to DNSE docs, the endpoint for getting orders is:
+            # https://api.dnse.com.vn/order-service/v2/orders?accountNo=<account>
+            url = f"{self.base_urls['order_service']}/v2/orders"
+            headers = {"Authorization": f"Bearer {self.jwt_token}"}
+            params = {"accountNo": account_no}
+            
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            data = response.json()
+            return data.get('orders', [])
+            
+        except HTTPError as e:
+            raise DNSEAPIError(f"Failed to get orders: HTTP {e.response.status_code}")
+        except Exception as e:
+            raise DNSEAPIError(f"Failed to get orders: {str(e)}")
+            
     def get_pending_orders(self, account_no: str) -> List[Dict[str, Any]]:
         """
         Get pending orders for an account.
+        This is implemented using the get_orders method and filtering for pending status.
         
         Args:
             account_no: Account number
@@ -608,14 +640,15 @@ class DNSEClient(ITradingClient):
         Returns:
             List of pending order dictionaries
         """
-        if not self.jwt_token:
-            raise DNSEAPIError("Must authenticate first")
-        
         try:
-            url = f"{self.base_urls['order_service']}/orders/pending"
-            headers = {"Authorization": f"Bearer {self.jwt_token}"}
-            params = {"accountNo": account_no}
+            all_orders = self.get_orders(account_no)
+            pending_statuses = ["pending", "pendingNew", "new", "partiallyFilled"]
+            pending_orders = [order for order in all_orders if order.get("orderStatus") in pending_statuses]
+            return pending_orders
             
+        except Exception as e:
+            raise DNSEAPIError(f"Failed to get pending orders: {str(e)}")
+                
             response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
             

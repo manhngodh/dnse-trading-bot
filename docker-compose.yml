@@ -10,7 +10,7 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
     ports:
-      - "5000:5000" # Map port for direct API access
+      - "5501:5501" # Map port for direct API access
     volumes:
       - ./backend:/app # Mount source code for hot reload
     networks:

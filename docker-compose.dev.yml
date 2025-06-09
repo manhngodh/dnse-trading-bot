@@ -11,33 +11,31 @@ services:
       - PYTHONDONTWRITEBYTECODE=1 # Don't write .pyc files
       - PYTHONUNBUFFERED=1 # Output logs immediately
     ports:
-      - "5001:5000" # Use port 5001 on host
+      - "5501:5501" # Use port 5501 on host to match with internal port
     volumes:
       - ./backend:/app # Mount source code for hot reload
     networks:
       - app-network
     command:
-      [
-        "uvicorn",
-        "main:app",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "5000",
-        "--reload",
-      ]
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5501", "--reload"]
 
   frontend:
     build:
       context: ./ui
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
     depends_on:
       - backend
     networks:
       - app-network
-    # You might want to add frontend dev server configuration here
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
 
 networks:
   app-network:

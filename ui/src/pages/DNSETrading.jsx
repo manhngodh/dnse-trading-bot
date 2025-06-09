@@ -78,6 +78,11 @@ const DNSETrading = ({ onAuthChange }) => {
         setSelectedAccount(data.accounts[0])
       }
     }
+    
+    // Pass auth data to parent component if onAuthChange prop exists
+    if (onAuthChange) {
+      onAuthChange(data)
+    }
   }
 
   const checkDNSEStatus = async () => {

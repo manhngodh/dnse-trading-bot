@@ -1,11 +1,12 @@
 import React from 'react'
-import { TrendingUp, Code, Globe, DollarSign } from 'lucide-react'
+import { TrendingUp, Code, Globe, DollarSign, ListOrdered } from 'lucide-react'
 
 const Navigation = ({ currentTab, setCurrentTab }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
     { id: 'strategy-editor', label: 'Strategy Editor', icon: Code },
     { id: 'dnse-trading', label: 'DNSE Trading', icon: DollarSign },
+    { id: 'orders', label: 'Orders', icon: ListOrdered },
     { id: 'krx-viewer', label: 'KRX MQTT Viewer', icon: Globe },
   ]
 
