@@ -102,7 +102,7 @@ class DNSEClient(ITradingClient):
             response.raise_for_status()
             
             response_data = response.json()
-            self.jwt_token = response_data.get("token")
+            self.jwt_token = response_data.get("token") # use token field for JWT
             
             if not self.jwt_token:
                 raise DNSEAPIError("No access token received from authentication")

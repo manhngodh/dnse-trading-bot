@@ -28,7 +28,7 @@ function App() {
       <div className="container mx-auto px-4 py-6">
         {currentTab === 'dashboard' && <Dashboard />}
         {currentTab === 'strategy-editor' && <StrategyEditor />}
-        {currentTab === 'dnse-trading' && <DNSETrading onAuthChange={handleAuthChange} />}
+        {currentTab === 'dnse-trading' && <DNSETrading />}
         {currentTab === 'orders' && <OrderList authData={authData} />}
       </div>
     </div>

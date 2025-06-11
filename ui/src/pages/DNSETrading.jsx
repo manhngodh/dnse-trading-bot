@@ -1,35 +1,28 @@
 import React, { useState, useEffect } from 'react'
-import { 
-  User, 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
-  Activity, 
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  RefreshCw,
-  Send,
-  X,
-  Shield
-} from 'lucide-react'
-import DNSEAuth from '../components/DNSEAuth'
+import { User, RefreshCw } from 'lucide-react'
 
-const DNSETrading = ({ onAuthChange }) => {
-  // Authentication state from DNSEAuth component
-  const [authData, setAuthData] = useState({
-    isAuthenticated: false,
-    hasTradingToken: false,
-    userInfo: null,
-    tradingToken: null,
-    accounts: []
-  })
+// Auth Components
+import DNSEAuth from '../components/auth/DNSEAuth'
+import LoginForm from '../components/auth/LoginForm'
 
+// Trading Components
+import AccountSelection from '../components/trading/AccountSelection'
+import BuyingPower from '../components/trading/BuyingPower'
+import PortfolioSummary from '../components/trading/PortfolioSummary'
+import OrderForm from '../components/trading/OrderForm'
+import PendingOrders from '../components/trading/PendingOrders'
+
+// Common Components
+import Alert from '../components/common/Alert'
+
+const DNSETrading = () => {
+  // Unified authentication state
   const [authState, setAuthState] = useState({
     isAuthenticated: false,
     hasJWT: false,
     hasTradingToken: false,
-    investorInfo: null
+    investorInfo: null,
+    tradingToken: null
   })
   
   const [credentials, setCredentials] = useState({
@@ -56,32 +49,40 @@ const DNSETrading = ({ onAuthChange }) => {
     orderType: 'limit'
   })
 
+  // Check auth status when component mounts
   useEffect(() => {
-    checkDNSEStatus()
+    console.log('Checking DNSE authentication status...', authState.isAuthenticated, loading)
+    if (!authState.isAuthenticated && !loading) {
+      setLoading(true);
+      checkDNSEStatus()
+        .finally(() => setLoading(false));
+    }
   }, [])
 
   // Handle authentication changes from DNSEAuth component
-  const handleAuthChange = (data) => {
-    setAuthData(data)
-    // Update legacy authState for compatibility
-    setAuthState(prev => ({
-      ...prev,
-      isAuthenticated: data.isAuthenticated,
-      hasTradingToken: data.hasTradingToken,
-      investorInfo: data.userInfo
-    }))
-    
-    // Update accounts from auth data
-    if (data.accounts && data.accounts.length > 0) {
-      setAccounts(data.accounts)
-      if (!selectedAccount) {
-        setSelectedAccount(data.accounts[0])
+  const handleAuthChange = async (data) => {
+    try {
+      // Update unified auth state
+      setAuthState(prev => ({
+        ...prev,
+        isAuthenticated: data.isAuthenticated,
+        hasTradingToken: data.hasTradingToken,
+        investorInfo: data.userInfo,
+        tradingToken: data.tradingToken
+      }))
+      
+      // Pass auth data to parent component if onAuthChange prop exists
+      if (onAuthChange) {
+        onAuthChange(data)
       }
-    }
-    
-    // Pass auth data to parent component if onAuthChange prop exists
-    if (onAuthChange) {
-      onAuthChange(data)
+
+      // If authenticated, load accounts
+      if (data.isAuthenticated) {
+        await loadAccounts()
+      }
+    } catch (error) {
+      console.error('Error in handleAuthChange:', error)
+      setError('Failed to complete authentication process')
     }
   }
 
@@ -89,13 +90,13 @@ const DNSETrading = ({ onAuthChange }) => {
     try {
       const response = await fetch('/api/dnse/status')
       const data = await response.json()
-      
-      setAuthState({
+      console.log('DNSE status response:', data.authenticated)
+      setAuthState(prev => ({
+        ...prev,
         isAuthenticated: data.authenticated,
         hasJWT: data.authenticated,
         hasTradingToken: data.has_trading_token,
-        investorInfo: authState.investorInfo
-      })
+      }))
     } catch (error) {
       console.error('Error checking DNSE status:', error)
     }
@@ -120,18 +121,48 @@ const DNSETrading = ({ onAuthChange }) => {
       })
       
       const data = await response.json()
+      console.log('Login response:', data)
       
-      if (data.success) {
+      // Check if we have an access token, which indicates success
+      if (data.access_token) {
+        // Extract user info from JWT token if possible
+        let investorInfo = null
+        try {
+          // JWT tokens have three parts separated by dots
+          const tokenParts = data.access_token.split('.');
+          if (tokenParts.length === 3) {
+            // Decode the middle part (payload)
+            const payload = JSON.parse(atob(tokenParts[1]));
+            investorInfo = {
+              fullName: payload.fullName || '',
+              email: payload.customerEmail || '',
+              mobile: payload.customerMobile || '',
+              customerId: payload.customerId || '',
+              userId: payload.userId || ''
+            };
+          }
+        } catch (error) {
+          console.error('Error parsing JWT token:', error);
+        }
+        
         setAuthState({
           isAuthenticated: true,
           hasJWT: true,
-          hasTradingToken: false,
-          investorInfo: data.investor_info
+          hasTradingToken: !data.requires_otp, // If requires_otp is true, we don't have trading token yet
+          investorInfo: investorInfo,
+          sessionId: data.session_id
         })
-        setSuccess('Login successful! Please request OTP for trading.')
+        
+        // Store token for subsequent requests
+        localStorage.setItem('dnse_access_token', data.access_token);
+        
+        setSuccess('Login successful!')
+        console.log('Investor Info:', authState)
         loadAccounts()
+      } else if (data.error) {
+        setError(data.error)
       } else {
-        setError(data.error || 'Login failed')
+        setError('Login failed: Invalid response from server')
       }
     } catch (error) {
       setError('Network error during login')
@@ -205,6 +236,8 @@ const DNSETrading = ({ onAuthChange }) => {
 
   const loadAccounts = async () => {
     try {
+      setLoading(true)
+      setError('')
       const response = await fetch('/api/dnse/accounts')
       const data = await response.json()
       
@@ -212,21 +245,38 @@ const DNSETrading = ({ onAuthChange }) => {
         setAccounts(data.accounts)
         if (data.accounts.length > 0) {
           setSelectedAccount(data.accounts[0])
-          loadAccountData(data.accounts[0].accountNo)
+          await loadAccountData(data.accounts[0].accountNo)
+        } else {
+          setError('No trading accounts found')
         }
+      } else {
+        setError(data.error || 'Failed to load accounts')
       }
     } catch (error) {
       console.error('Error loading accounts:', error)
+      setError('Network error while loading accounts')
+    } finally {
+      setLoading(false)
     }
   }
 
   const loadAccountData = async (accountNo) => {
+    if (!accountNo) {
+      console.error('No account number provided to loadAccountData')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    
     try {
       // Load portfolio
       const portfolioResponse = await fetch(`/api/dnse/portfolio/${accountNo}`)
       const portfolioData = await portfolioResponse.json()
       if (portfolioData.success) {
         setPortfolio(portfolioData.portfolio)
+      } else {
+        console.error('Failed to load portfolio:', portfolioData.error)
       }
 
       // Load buying power
@@ -234,6 +284,8 @@ const DNSETrading = ({ onAuthChange }) => {
       const buyingPowerData = await buyingPowerResponse.json()
       if (buyingPowerData.success) {
         setBuyingPower(buyingPowerData.buying_power)
+      } else {
+        console.error('Failed to load buying power:', buyingPowerData.error)
       }
 
       // Load pending orders
@@ -241,9 +293,14 @@ const DNSETrading = ({ onAuthChange }) => {
       const ordersData = await ordersResponse.json()
       if (ordersData.success) {
         setPendingOrders(ordersData.orders)
+      } else {
+        console.error('Failed to load pending orders:', ordersData.error)
       }
     } catch (error) {
       console.error('Error loading account data:', error)
+      setError('Failed to load account information')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -370,25 +427,8 @@ const DNSETrading = ({ onAuthChange }) => {
       </div>
 
       {/* Alerts */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
-          <AlertCircle className="h-5 w-5 text-red-500" />
-          <span className="text-red-700">{error}</span>
-          <button onClick={() => setError('')} className="ml-auto text-red-500">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-2">
-          <CheckCircle className="h-5 w-5 text-green-500" />
-          <span className="text-green-700">{success}</span>
-          <button onClick={() => setSuccess('')} className="ml-auto text-green-500">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      <Alert type="error" message={error} onClose={() => setError('')} />
+      <Alert type="success" message={success} onClose={() => setSuccess('')} />
 
       {/* Authentication Section */}
       {!authState.isAuthenticated && (
@@ -432,224 +472,35 @@ const DNSETrading = ({ onAuthChange }) => {
         </div>
       )}
 
-      {/* OTP Section */}
-      {authState.isAuthenticated && !authState.hasTradingToken && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4 flex items-center space-x-2">
-            <Clock className="h-5 w-5" />
-            <span>Trading Authorization</span>
-          </h2>
-          
-          <div className="space-y-4">
-            <div className="flex space-x-4">
-              <button
-                onClick={handleRequestOTP}
-                disabled={loading}
-                className="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
-              >
-                {loading ? 'Sending...' : 'Request OTP'}
-              </button>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">OTP Code</label>
-              <input
-                type="text"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter OTP from email"
-              />
-            </div>
-            
-            <button
-              onClick={handleVerifyOTP}
-              disabled={loading || !otpCode}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-            >
-              {loading ? 'Verifying...' : 'Verify OTP'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Main Trading Interface */}
-      {authState.isAuthenticated && authState.hasTradingToken && (
+      {authState.isAuthenticated && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
           {/* Account Info & Portfolio */}
           <div className="space-y-6">
-            
-            {/* Account Selection */}
-            {accounts.length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold mb-4">Account Selection</h3>
-                <select
-                  value={selectedAccount?.accountNo || ''}
-                  onChange={(e) => {
-                    const account = accounts.find(acc => acc.accountNo === e.target.value)
-                    setSelectedAccount(account)
-                    if (account) loadAccountData(account.accountNo)
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  {accounts.map(account => (
-                    <option key={account.accountNo} value={account.accountNo}>
-                      {account.accountNo} - {account.accountType || 'Trading Account'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Buying Power */}
-            {buyingPower && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-                  <DollarSign className="h-5 w-5" />
-                  <span>Buying Power</span>
-                </h3>
-                <div className="text-2xl font-bold text-green-600">
-                  {buyingPower.buyingPower?.toLocaleString()} VND
-                </div>
-                <p className="text-sm text-gray-600 mt-1">Available for trading</p>
-              </div>
-            )}
-
-            {/* Portfolio Summary */}
-            {portfolio && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-                  <Activity className="h-5 w-5" />
-                  <span>Portfolio Summary</span>
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total Value:</span>
-                    <span className="font-semibold">{portfolio.totalValue?.toLocaleString()} VND</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Cash:</span>
-                    <span className="font-semibold">{portfolio.cash?.toLocaleString()} VND</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Securities:</span>
-                    <span className="font-semibold">{portfolio.securitiesValue?.toLocaleString()} VND</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            <AccountSelection
+              accounts={accounts}
+              selectedAccount={selectedAccount}
+              onAccountChange={(account) => {
+                setSelectedAccount(account);
+                if (account) loadAccountData(account.accountNo);
+              }}
+            />
+            <BuyingPower buyingPower={buyingPower} />
+            <PortfolioSummary portfolio={portfolio} />
           </div>
 
           {/* Order Form & Pending Orders */}
           <div className="space-y-6">
-            
-            {/* Order Form */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-                <Send className="h-5 w-5" />
-                <span>Place Order</span>
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Symbol</label>
-                    <input
-                      type="text"
-                      value={orderForm.symbol}
-                      onChange={(e) => setOrderForm(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="VCI"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Side</label>
-                    <select
-                      value={orderForm.side}
-                      onChange={(e) => setOrderForm(prev => ({ ...prev, side: e.target.value }))}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="buy">Buy</option>
-                      <option value="sell">Sell</option>
-                    </select>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Quantity</label>
-                    <input
-                      type="number"
-                      value={orderForm.quantity}
-                      onChange={(e) => setOrderForm(prev => ({ ...prev, quantity: e.target.value }))}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="100"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Price</label>
-                    <input
-                      type="number"
-                      value={orderForm.price}
-                      onChange={(e) => setOrderForm(prev => ({ ...prev, price: e.target.value }))}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="25000"
-                    />
-                  </div>
-                </div>
-                
-                <button
-                  onClick={handlePlaceOrder}
-                  disabled={loading}
-                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${
-                    orderForm.side === 'buy' 
-                      ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
-                      : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                  }`}
-                >
-                  {loading ? 'Placing...' : `Place ${orderForm.side === 'buy' ? 'Buy' : 'Sell'} Order`}
-                </button>
-              </div>
-            </div>
-
-            {/* Pending Orders */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-4">Pending Orders</h3>
-              
-              {pendingOrders.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No pending orders</p>
-              ) : (
-                <div className="space-y-2">
-                  {pendingOrders.map((order, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium">{order.symbol}</span>
-                          <span className={`px-2 py-1 text-xs rounded ${
-                            order.side === 'buy' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {order.side?.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {order.quantity} @ {order.price?.toLocaleString()} VND
-                        </div>
-                      </div>
-                      
-                      <button
-                        onClick={() => handleCancelOrder(order.orderId)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <OrderForm
+              formData={orderForm}
+              onChange={setOrderForm}
+              onSubmit={handlePlaceOrder}
+              loading={loading}
+            />
+            <PendingOrders
+              orders={pendingOrders}
+              onCancelOrder={handleCancelOrder}
+            />
           </div>
         </div>
       )}

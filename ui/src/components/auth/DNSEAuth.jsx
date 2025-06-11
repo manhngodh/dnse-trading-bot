@@ -61,11 +61,12 @@ const DNSEAuth = ({ onAuthChange }) => {
       } else if (data.authenticated) {
         setAuthState(prev => ({
           ...prev,
-          step: 'otp',
+          step: 'loggedin', // Stay logged in, allow OTP request for trading
           isAuthenticated: true,
           hasTradingToken: false,
           tradingToken: null
         }))
+        loadUserInfo()
       } else {
         setAuthState(prev => ({
           ...prev,
@@ -111,13 +112,13 @@ const DNSEAuth = ({ onAuthChange }) => {
       const data = await response.json()
 
       if (data.success) {
-        showAlert('Login successful! Please check your email for OTP.', 'success')
+        showAlert('Login successful! You are now logged in.', 'success')
         setAuthState(prev => ({
           ...prev,
-          step: 'otp',
+          step: 'loggedin', // New step for logged-in, not trading
           isAuthenticated: true
         }))
-        requestOTP() // Auto-request OTP
+        // Do NOT call requestOTP() automatically
       } else {
         showAlert(data.error || 'Login failed', 'error')
       }
@@ -332,6 +333,35 @@ const DNSEAuth = ({ onAuthChange }) => {
     </div>
   )
 
+  const renderLoggedInStep = () => (
+    <div className="space-y-4">
+      <div className="text-center mb-6">
+        <Shield className="h-12 w-12 text-blue-600 mx-auto mb-3" />
+        <h2 className="text-xl font-bold text-gray-900">Welcome to DNSE</h2>
+        <p className="text-sm text-gray-600">You are logged in. To enable trading, request and verify OTP.</p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setAuthState(prev => ({ ...prev, step: 'otp' }))}
+        disabled={authState.isLoading}
+        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+      >
+        <Mail className="h-4 w-4" />
+        <span>Request OTP for Trading</span>
+      </button>
+
+      <button
+        onClick={handleLogout}
+        disabled={authState.isLoading}
+        className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+      >
+        <LogOut className="h-4 w-4" />
+        <span>Logout</span>
+      </button>
+    </div>
+  )
+
   const renderOTPStep = () => (
     <div className="space-y-4">
       <div className="text-center mb-6">
@@ -448,15 +478,14 @@ const DNSEAuth = ({ onAuthChange }) => {
   return (
     <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
       {renderAlert()}
-      
       {authState.isLoading && (
         <div className="flex items-center justify-center space-x-2 mb-4 text-blue-600">
           <RefreshCw className="h-4 w-4 animate-spin" />
           <span className="text-sm">Processing...</span>
         </div>
       )}
-
       {authState.step === 'login' && renderLoginStep()}
+      {authState.step === 'loggedin' && renderLoggedInStep()}
       {authState.step === 'otp' && renderOTPStep()}
       {authState.step === 'success' && renderSuccessStep()}
     </div>

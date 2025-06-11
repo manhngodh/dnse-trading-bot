@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Request, Response
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import logging
 from services.auth_service import AuthService
+from services.session_manager import SessionManager
 
 # Create module logger
 logger = logging.getLogger("dnse-trading")
@@ -18,6 +19,15 @@ class OTPRequest(BaseModel):
     otp_code: str
     session_id: str
 
+class AccountResponse(BaseModel):
+    accountNo: str
+    accountType: Optional[str] = None
+    status: Optional[str] = None
+    
+class AccountsResponse(BaseModel):
+    success: bool = True
+    accounts: List[AccountResponse] = []
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -26,7 +36,7 @@ class AuthResponse(BaseModel):
     requires_otp: bool = False
 
 @router.post("/login", response_model=AuthResponse)
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, response: Response):
     """
     Authenticate user with DNSE Trading API
     """
@@ -48,13 +58,30 @@ async def login(login_data: LoginRequest):
         # Get session ID from investor info
         session_id = str(auth_result["investor_info"]["investorId"])
         
-        # Request OTP for trading
-        auth_service.request_otp(session_id)
+        # Set session cookie
+        response.set_cookie(
+            key="dnse_session_id",
+            value=session_id,
+            max_age=3600,  # 1 hour
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax"
+        )
+        
+        # Ensure session is initialized with otp_verified: False and trading_token: None
+        session_manager = SessionManager()
+        session_manager.update_session(session_id, {
+            "otp_verified": False,
+            "trading_token": None
+        })
+        
+        # Don't request OTP automatically - let user browse data first
+        # OTP will be requested when trading actions are attempted
         
         return {
             "access_token": auth_result["jwt_token"],
             "expires_in": 3600,  # Token typically expires in 1 hour
-            "requires_otp": True,
+            "requires_otp": False,  # Changed: OTP not required immediately
             "session_id": session_id
         }
         
@@ -74,7 +101,7 @@ async def login(login_data: LoginRequest):
             )
 
 @router.post("/verify-otp", response_model=AuthResponse)
-async def verify_otp(otp_data: OTPRequest):
+async def verify_otp(otp_data: OTPRequest, response: Response):
     """
     Verify OTP code for second-factor authentication with DNSE
     """
@@ -88,6 +115,16 @@ async def verify_otp(otp_data: OTPRequest):
         result = auth_service.verify_otp(
             otp_code=otp_data.otp_code,
             session_id=otp_data.session_id
+        )
+        
+        # Update session cookie to keep it fresh
+        response.set_cookie(
+            key="dnse_session_id",
+            value=otp_data.session_id,
+            max_age=3600,  # 1 hour
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax"
         )
         
         # OTP verification successful
@@ -111,3 +148,78 @@ async def verify_otp(otp_data: OTPRequest):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"DNSE OTP verification error: {str(e)}"
             )
+
+
+@router.get("/accounts", response_model=AccountsResponse)
+async def get_accounts(request: Request):
+    """
+    Get user's trading accounts
+    """
+    # Get session ID from cookie
+    session_id = request.cookies.get("dnse_session_id")
+    
+    if not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No active session found. Please login first."
+        )
+    
+    # Check if session exists in Redis
+    session_manager = SessionManager()
+    session_data = session_manager.get_session(session_id)
+    
+    if not session_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please login again."
+        )
+    
+    # Create auth service with session ID to restore authenticated client
+    auth_service = AuthService(session_id=session_id)
+    
+    try:
+        # Get accounts from DNSE
+        accounts = auth_service.get_accounts()
+        
+        # Format the accounts for the response model
+        formatted_accounts = [
+            {
+                "accountNo": acc.get("accountNo", ""),
+                "accountType": acc.get("accountType", "Standard"),
+                "status": acc.get("status", "Active")
+            }
+            for acc in accounts
+        ]
+        
+        # Extend session TTL
+        session_manager.extend_session(session_id)
+        
+        return {
+            "success": True,
+            "accounts": formatted_accounts
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching DNSE accounts: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch DNSE accounts: {str(e)}"
+        )
+
+@router.get("/status")
+async def get_status(request: Request):
+    """
+    Get current authentication and trading status for the user session
+    """
+    session_id = request.cookies.get("dnse_session_id")
+    if not session_id:
+        return {"authenticated": False, "has_trading_token": False}
+    session_manager = SessionManager()
+    session_data = session_manager.get_session(session_id)
+    if not session_data:
+        return {"authenticated": False, "has_trading_token": False}
+    return {
+        "authenticated": session_data.get("authenticated", False),
+        "has_trading_token": bool(session_data.get("trading_token")),
+        "trading_token": session_data.get("trading_token")
+    }

@@ -6,3 +6,4 @@ python-dotenv
 requests
 pandas
 paho-mqtt
+redis>=4.0.0

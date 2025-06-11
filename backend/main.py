@@ -8,6 +8,7 @@ from core.logging import setup_logging, log_request_middleware
 
 # Import route routers - uncomment as you create the FastAPI routers
 from routes.auth import router as auth_router
+from routes.redis_routes import router as redis_router
 # from routes.order_fastapi import router as order_router
 # from routes.portfolio_fastapi import router as portfolio_router
 
@@ -49,6 +50,7 @@ async def health_check():
 
 # Include routers
 app.include_router(auth_router, prefix='/api/dnse', tags=["Authentication"])
+app.include_router(redis_router, prefix='/api', tags=["Redis"])
 # app.include_router(market_router, prefix='/api/market', tags=["Market Data"])
 # app.include_router(order_router, prefix='/api/order', tags=["Order Management"])
 # app.include_router(portfolio_router, prefix='/api/portfolio', tags=["Portfolio"])
