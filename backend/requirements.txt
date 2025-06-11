@@ -5,5 +5,9 @@ python-multipart
 python-dotenv
 requests
 pandas
+numpy
 paho-mqtt
 redis>=4.0.0
+aiofiles
+asyncio-mqtt
+websockets

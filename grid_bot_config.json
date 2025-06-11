@@ -1,0 +1,78 @@
+{
+  "_comments": {
+    "api": "DNSE API credentials and connection settings",
+    "strategy": "Grid trading strategy parameters",
+    "risk": "Risk management settings",
+    "operational": "Bot operational settings",
+    "notifications": "Alert and notification settings"
+  },
+  "api": {
+    "username": "",
+    "password": "",
+    "base_url": "https://api.dnse.com.vn",
+    "mqtt_host": "datafeed-lts-krx.dnse.com.vn",
+    "mqtt_port": 443,
+    "timeout": 15,
+    "retry_attempts": 3
+  },
+  "strategy": {
+    "symbol": "HPG",
+    "account_no": "",
+    "loan_package_id": null,
+    "grid_mode": "recursive",
+    "grid_levels": 8,
+    "grid_spacing_pct": 0.02,
+    "grid_span_pct": 0.16,
+    "initial_qty_pct": 0.08,
+    "ddown_factor": 1.5,
+    "max_position_size": 5000,
+    "min_markup_pct": 0.005,
+    "markup_range_pct": 0.015,
+    "wallet_exposure_limit_pct": 0.25,
+    "max_drawdown_pct": 0.08,
+    "stop_loss_pct": null,
+    "ema_span_0": 12,
+    "ema_span_1": 26,
+    "use_ema_smoothing": true,
+    "price_precision": 0,
+    "min_order_value": 100000
+  },
+  "risk": {
+    "max_daily_loss": 1000000,
+    "max_open_orders": 20,
+    "position_size_limit": 0.5,
+    "emergency_stop_enabled": true,
+    "emergency_stop_loss_pct": 0.15
+  },
+  "operational": {
+    "monitoring_interval": 5,
+    "log_level": "INFO",
+    "log_file": "grid_bot.log",
+    "enable_market_data_stream": true,
+    "market_data_fallback": true,
+    "fallback_update_interval": 10,
+    "dry_run": false,
+    "auto_restart": false,
+    "max_restart_attempts": 3
+  },
+  "notifications": {
+    "enabled": false,
+    "email": {
+      "enabled": false,
+      "smtp_server": "",
+      "smtp_port": 587,
+      "username": "",
+      "password": "",
+      "to_address": ""
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "",
+      "events": [
+        "trade",
+        "error",
+        "stop"
+      ]
+    }
+  }
+}
